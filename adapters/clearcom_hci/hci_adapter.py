@@ -1,60 +1,66 @@
+import socket
 import threading
-# Hypothetical import for Clear-Com HCI Python SDK
-# from clearcom_hci_sdk import HCIClient, KeyEvent
+from typing import Callable
 
 class HCIAdapter:
     """
-    Adapter for Clear-Com Eclipse HCI / Station-IC SDK.
-    Listens for station/beltpack events and converts them into ClearCon core events.
+    Adapter for Clear-Com Eclipse HX Host Control Interface (HCI).
+    Listens for beltpack key events and converts them into ClearCon core events.
     """
 
-    def __init__(self, channel_manager):
+    def __init__(self, channel_manager, host: str, port: int = 52001):
         self.channel_manager = channel_manager
-        self.client = None
+        self.host = host
+        self.port = port
+        self.socket = None
         self._stop = False
         self.thread = threading.Thread(target=self._event_loop, daemon=True)
 
-    def connect(self, host: str, port: int = 5000):
+    def connect(self):
         """
-        Connect to the HCI server (Eclipse HX / Station-IC).
+        Connect to the Eclipse HX system via HCI.
         """
-        # TODO: Replace with real SDK connection
-        # self.client = HCIClient(host, port)
-        # self.client.register_key_callback(self._handle_key_event)
-        print(f"[HCIAdapter] Connecting to {host}:{port}")
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.connect((self.host, self.port))
+        print(f"[HCIAdapter] Connected to {self.host}:{self.port}")
         self.thread.start()
 
     def _event_loop(self):
         """
-        Poll or listen to SDK events.
+        Poll for HCI events and handle them.
         """
         while not self._stop:
-            # TODO: Replace with real SDK event fetching
-            # Example:
-            # events = self.client.get_events()
-            # for event in events:
-            #     if isinstance(event, KeyEvent):
-            #         self._handle_key_event(event)
-            pass
+            data = self.socket.recv(1024)
+            if data:
+                self._handle_event(data)
 
-    def _handle_key_event(self, event):
+    def _handle_event(self, data: bytes):
         """
-        Convert SDK key event to ClearCon actions.
+        Parse and handle an HCI event.
         """
-        user_id = event.user_id  # SDK-defined
-        button_name = event.key_name  # SDK-defined
-        action = event.action  # 'press' / 'release'
+        # Example: Parse the event data and determine the action
+        # This is a simplified example; actual parsing depends on HCI protocol specifics
+        event_type = data[0]
+        if event_type == 0x01:  # Key press event
+            key_code = data[1]
+            self._process_key_event(key_code)
 
-        if action == 'press':
-            if button_name == 'channel_up':
-                self.channel_manager.switch_user_to_next_channel(user_id)
-            elif button_name == 'channel_down':
-                self.channel_manager.switch_user_to_prev_channel(user_id)
-            elif button_name == 'mute':
-                self.channel_manager.toggle_mute(user_id)
+    def _process_key_event(self, key_code: int):
+        """
+        Process a key press event.
+        """
+        if key_code == 0x01:  # Example: 'Channel Up' key
+            self.channel_manager.switch_user_to_next_channel()
+        elif key_code == 0x02:  # Example: 'Channel Down' key
+            self.channel_manager.switch_user_to_prev_channel()
+        elif key_code == 0x03:  # Example: 'Mute' key
+            self.channel_manager.toggle_mute()
 
     def disconnect(self):
+        """
+        Disconnect from the Eclipse HX system.
+        """
         self._stop = True
-        if self.client:
-            # self.client.disconnect()
-            print("[HCIAdapter] Disconnected")
+        if self.socket:
+            self.socket.close()
+        print("[HCIAdapter] Disconnected")
