@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 class IIntercomAdapter(ABC):
     """
     Abstract interface for all intercom adapters.
-    Any adapter (Eclipse HX, Arcadia, HME DX, etc.) must implement these methods.
+    Any adapter (Eclipse HX, Arcadia, HME DX, Station-IC, etc.) must implement these methods.
     """
 
     @abstractmethod
@@ -29,7 +29,7 @@ class IIntercomAdapter(ABC):
         """
         Set the output volume for a specific channel.
         :param channel: Channel number
-        :param level: Volume level (0.0 - 1.0)
+        :param level: Volume level (0.0 – 1.0)
         """
         pass
 
