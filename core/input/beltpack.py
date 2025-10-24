@@ -2,8 +2,8 @@ from typing import Callable
 
 class Beltpack:
     """
-    Simulates a beltpack input device.
-    Can trigger callbacks when buttons are "pressed".
+    Simulates a beltpack input device for testing.
+    Can trigger callbacks when buttons are "pressed" virtually.
     """
 
     def __init__(self):
@@ -20,7 +20,7 @@ class Beltpack:
 
     def press_button(self, button_name: str):
         """
-        Simulate a beltpack button press.
+        Simulate a beltpack button press for testing.
         """
         if button_name in self._callbacks:
             self._callbacks[button_name]()
