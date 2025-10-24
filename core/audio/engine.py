@@ -1,44 +1,56 @@
-import sounddevice as sd
 import numpy as np
+import sounddevice as sd
 
 class AudioEngine:
     """
-    Core audio capture and playback engine for ClearCon.
+    Handles real base audio per user, per-channel volume, auto-limiter, and levels.
     """
 
-    def __init__(self, samplerate=48000, channels=2):
-        self.samplerate = samplerate
-        self.channels = channels
-        self.buffer_size = 1024
-        self.input_buffer = b""
-        self.output_buffer = b""
+    def __init__(self):
+        self.user_channels = {}        # user_id -> channel
+        self.muted_users = set()
+        self.user_volumes = {}         # user_id -> 0.0-1.0
+        self.channel_levels = {}       # user_id -> 0.0-1.0
+        self.buffers = {}              # user_id -> list of numpy arrays
 
-    def capture_desktop_audio(self) -> bytes:
-        """
-        Capture a short chunk of desktop (loopback) audio.
-        Works on Windows (WASAPI loopback) and macOS (requires Loopback or BlackHole).
-        """
-        try:
-            data = sd.rec(
-                self.buffer_size,
-                samplerate=self.samplerate,
-                channels=self.channels,
-                dtype="float32",
-            )
-            sd.wait()
-            return data.tobytes()
-        except Exception as e:
-            print(f"[AudioEngine] Desktop capture failed: {e}")
-            return b""
+        self.playback_stream = sd.OutputStream(channels=2, samplerate=48000)
+        self.playback_stream.start()
 
-    def play_audio(self, audio_data: bytes):
-        """
-        Play received audio to monitoring output.
-        """
-        try:
-            np_data = np.frombuffer(audio_data, dtype="float32")
-            np_data = np_data.reshape(-1, self.channels)
-            sd.play(np_data, samplerate=self.samplerate)
-            sd.wait()
-        except Exception as e:
-            print(f"[AudioEngine] Playback failed: {e}")
+    def set_user_volume(self, user_id, volume: float):
+        self.user_volumes[user_id] = np.clip(volume, 0.0, 1.0)
+
+    def push_audio(self, user_id, pcm_bytes):
+        if user_id in self.muted_users:
+            return
+
+        data = np.frombuffer(pcm_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+
+        # Apply per-user volume
+        vol = self.user_volumes.get(user_id, 1.0)
+        data *= vol
+
+        # Auto-limiter
+        data = np.clip(data, -0.8, 0.8)
+
+        self.buffers.setdefault(user_id, []).append(data)
+
+        # Update UI meter RMS
+        level = np.sqrt(np.mean(data**2))
+        self.channel_levels[user_id] = float(np.clip(level, 0, 1))
+
+        self.mix_and_play()
+
+    def mix_and_play(self):
+        if not self.buffers:
+            return
+        mix = None
+        for user_id, buf_list in self.buffers.items():
+            if buf_list:
+                data = buf_list.pop(0)
+                if mix is None:
+                    mix = data
+                else:
+                    mix = np.add(mix, data, out=mix, casting="unsafe")
+        if mix is not None:
+            mix = np.clip(mix, -1.0, 1.0)
+            self.playback_stream.write((mix * 32767).astype(np.int16))
