@@ -13,7 +13,7 @@ class AudioEngine:
         Capture audio from the desktop (PC) to broadcast to intercom channels.
         Currently a stub: returns empty bytes.
         """
-        # TODO: Integrate actual desktop capture (e.g., PortAudio, WASAPI)
+        # TODO: Integrate actual desktop capture (e.g., WASAPI, PortAudio)
         return b""
 
     def play_audio(self, audio_data: bytes):
@@ -21,5 +21,5 @@ class AudioEngine:
         Play received audio to monitoring output.
         Currently a stub: does nothing.
         """
-        # TODO: Integrate actual playback system
         self.output_buffer = audio_data
+        # TODO: Integrate actual playback system
